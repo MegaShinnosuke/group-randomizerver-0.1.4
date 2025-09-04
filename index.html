@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>グループ分けツール</title>
+
+  <!-- PWA設定 -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#000000">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="グループ分けツール">
+
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "メイリオ", sans-serif;
+      padding: 15px;
+      background: #000; /* 背景を黒 */
+      color: #fff;      /* テキスト白 */
+    }
+    h1 {
+      text-align: center;
+      font-size: 1.8em;
+      margin-bottom: 10px;
+      color: #fff;
+    }
+    p {
+      text-align: center;
+      font-size: 0.9em;
+      color: #ccc;
+      margin-bottom: 15px;
+    }
+    textarea {
+      display: none; /* 既存のUIは残すが非表示 */
+    }
+    button {
+      display: block;
+      width: 100%;
+      padding: 12px;
+      margin: 10px 0;
+      font-size: 16px;
+      background: linear-gradient(135deg, #d32f2f, #b71c1c); /* 赤系 */
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+      transition: transform 0.1s ease, box-shadow 0.1s ease;
+    }
+    button:hover {
+      transform: scale(1.02);
+      box-shadow: 0 4px 10px rgba(255, 0, 0, 0.5);
+    }
+    #result {
+      white-space: pre-wrap;
+      background-color: #111; /* 黒背景に馴染むダークグレー */
+      color: #fff;
+      padding: 15px;
+      border: 1px solid #444;
+      border-radius: 10px;
+      margin-top: 20px;
+      font-family: "Courier New", monospace;
+      font-size: 15px;
+      box-shadow: 0 2px 8px rgba(255, 0, 0, 0.2);
+      max-height: 300px;
+      overflow-y: auto;
+    }
+    /* 2列グリッド */
+    #nameGrid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+    .nameItem {
+      display: flex;
+      align-items: center;
+      padding: 6px 10px;
+      border: 1px solid #444;
+      border-radius: 6px;
+      background: #111;
+      color: #fff;
+      cursor: pointer;
+    }
+    .nameItem.selected {
+      background: linear-gradient(180deg, #3a3f4a, #2b2f38); /* Win11風ブルーグレー */
+      border: 1px solid #444;
+      color: #fff;
+    }
+    .nameItem input {
+      margin-right: 8px;
+    }
+    @media (max-width: 600px) {
+      h1 {
+        font-size: 1.5em;
+      }
+      button {
+        font-size: 15px;
+        padding: 10px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <h1>グループ分けツール</h1>
+  <p>チェックを入れた人だけでグループ分けできます（出力時に「ちゃん」が付きます）</p>
+
+  <!-- 固定名簿を表示するグリッド -->
+  <div id="nameGrid"></div>
+  
+  <button onclick="makeGroups()">👻 グループ作成</button>
+  <button onclick="resetResult()">🗑 履歴リセット</button>
+  <button onclick="copyResult()">✔️ 結果をコピー</button>
+
+  <div id="result"></div>
+
+  <script>
+    // 固定メンバー
+    const members = [
+      { display: "Hei", output: "へいちゃん" },
+      { display: "sabaris", output: "さばちゃん" },
+      { display: "Lapis", output: "ラピちゃん" },
+      { display: "TAMA", output: "たまちゃん" },
+      { display: "しばじろう", output: "しばちゃん" },
+      { display: "しろ子", output: "しろちゃん" },
+      { display: "サクヤ", output: "わんわんサクちゃん" },
+      { display: "すい", output: "すいちゃん" },
+      { display: "たい", output: "たいちゃん" },
+      { display: "たかこっこ", output: "たかちゃん" },
+      { display: "ぬーえ", output: "ぬえちゃん" },
+      { display: "まみみ", output: "まみちゃん" },
+      { display: "まめしばぁぁぁ", output: "まめちゃん" },
+      { display: "み～こ", output: "み～ちゃん" },
+      { display: "めがむー", output: "めがちゃん" },
+      { display: "ももんが", output: "ももちゃん" },
+      { display: "りあ", output: "りあちゃん" },
+      { display: "アイリーン", output: "アイちゃん" },
+      { display: "コロボックル", output: "コロちゃん" },
+      { display: "ディ・マリア大佐", output: "ベジータちゃん" },
+      { display: "ミズキ", output: "ミズちゃん" },
+      { display: "メメノア", output: "メメちゃん" },
+      { display: "茶々", output: "ちゃちゃちゃん" },
+      { display: "Ren", output: "レンちゃん" },
+      { display: "シンノスケ", output: "しんちゃん" },
+    ];
+
+    // グリッド生成
+    const grid = document.getElementById("nameGrid");
+    members.forEach((m, idx) => {
+      const item = document.createElement("div");
+      item.className = "nameItem";
+      const checkbox = document.createElement("input");
+      checkbox.type = "checkbox";
+      checkbox.id = "chk" + idx;
+      const label = document.createElement("label");
+      label.setAttribute("for", "chk" + idx);
+      label.textContent = m.display;
+
+      checkbox.addEventListener("change", () => {
+        item.classList.toggle("selected", checkbox.checked);
+      });
+
+      item.appendChild(checkbox);
+      item.appendChild(label);
+      grid.appendChild(item);
+    });
+
+    let historyLog = {};
+
+    function makeGroups() {
+      const checkedMembers = [];
+      members.forEach((m, idx) => {
+        const cb = document.getElementById("chk" + idx);
+        if (cb.checked) checkedMembers.push(m.output);
+      });
+
+      if (checkedMembers.length === 0) return;
+
+      // シャッフル
+      for (let i = checkedMembers.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [checkedMembers[i], checkedMembers[j]] = [checkedMembers[j], checkedMembers[i]];
+      }
+
+      // グループ分けロジック（既存のまま）
+      const groupSizes = [];
+      let remaining = checkedMembers.length;
+      while (remaining > 0) {
+        if (remaining === 13) groupSizes.push(4, 3, 3, 3), (remaining = 0);
+        else if (remaining === 10) groupSizes.push(4, 3, 3), (remaining = 0);
+        else if (remaining === 9) groupSizes.push(3, 3, 3), (remaining = 0);
+        else if (remaining === 7) groupSizes.push(4, 3), (remaining = 0);
+        else if (remaining === 6) groupSizes.push(3, 3), (remaining = 0);
+        else if (remaining === 5) groupSizes.push(3, 2), (remaining = 0);
+        else if (remaining >= 4) groupSizes.push(4), (remaining -= 4);
+        else groupSizes.push(remaining), (remaining = 0);
+      }
+
+      const groups = [];
+      let index = 0;
+      for (let size of groupSizes) {
+        groups.push(checkedMembers.slice(index, index + size));
+        index += size;
+      }
+
+      const groupLabels = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+      const now = new Date();
+      const dateStr =
+        now.toLocaleDateString("ja-JP", {
+          year: "2-digit",
+          month: "2-digit",
+          day: "2-digit",
+        }) +
+        " " +
+        now.toTimeString().slice(0, 5);
+
+      // ☆21個で囲む
+      const stars = "☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆"; // 21個
+      let output = stars + "\n";
+      output += `${dateStr} 時点      左の人から貼っていこー！\n\n`;
+
+      groups.forEach((group, i) => {
+        const label = `ｸﾞﾙｰﾌﾟ${groupLabels[i]}（${group.length}人）：`;
+        output += `${label}${group.join("、")}\n-------------------------------\n`;
+      });
+
+      output += "\n" + stars;
+
+      document.getElementById("result").innerText = output;
+
+      // 履歴更新（既存機能）
+      for (let group of groups) {
+        for (let member of group) {
+          if (!historyLog[member]) historyLog[member] = new Set();
+          group.forEach((other) => {
+            if (other !== member) historyLog[member].add(other);
+          });
+        }
+      }
+    }
+
+    function resetResult() {
+      document.getElementById("result").innerText = "";
+      historyLog = {};
+    }
+
+    function copyResult() {
+      const text = document.getElementById("result").innerText;
+      navigator.clipboard.writeText(text).then(
+        () => alert("結果をコピーしました！"),
+        (err) => alert("コピーに失敗しました: " + err)
+      );
+    }
+
+    // PWAのService Worker登録
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('service-worker.js')
+        .then(() => console.log("Service Worker registered"));
+    }
+  </script>
+</body>
+</html>
